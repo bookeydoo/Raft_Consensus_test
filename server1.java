@@ -1,18 +1,22 @@
 
 
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.lang.Thread;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.util.Random;
 import java.util.Scanner;
-
+import java.util.random.*;
 
 //basic server that does does summation to 2 values and return it
 
 public class server1 extends Thread{
-    private static ServerSocket srvr=null;
-    private static ServerSocket ListenSocket=null;
 
+    public static Random random=Random;
+
+    private static ServerSocket srvr=null;
 
     public static int port=65530;// default port
     public static void start_server(int Port) {
@@ -23,7 +27,7 @@ public class server1 extends Thread{
             System.out.print("started the server on port "+port);
 
             while(true){
-                Socket clientsock=srvr.accept();
+                Socket clientsock=srvr.acc-ept();
                 System.out.print("connection occured");
                 new Thread(() -> Handle_client(clientsock)).start();
             }
@@ -35,11 +39,31 @@ public class server1 extends Thread{
 
     }
 
-    
-    private static void listenForLeader(){
+    private static void connectToPeers(int Port){
 
+        
+        int Timeout=random.nextInt(50,200);
+        boolean connected=false;
+        InetSocketAddress address=new InetSocketAddress(Port);
+       while (!connected) {
+        
+       
+        try(Socket socket=new Socket()){
+            System.out.print("attempting to connect  to node :"+Port+"timeout:"+Timeout+"ms \n");
+            socket.connect(address,Timeout);
+            
+            connected=true;
+            System.out.print("we are connected");
+            
+        }   catch(SocketTimeoutException e){
+            System.out.print("Timeout connecting to "+Port+" Retrying...\n");
+            socket.connect(address,Timeout);
+        }catch(IOException IE){
+            System.out.print("failed to connect to node "+Port+IE.getMessage());
+            break;
+        }
     }
-
+}
 
     private static void Handle_client(Socket clientsock){
         try(
@@ -82,6 +106,7 @@ public class server1 extends Thread{
             }
     }
         new Thread(()->server1.start_server(port)).start();
+        new Thread(()->server1.connectToPeers(65531)).start();
 
 
     }
