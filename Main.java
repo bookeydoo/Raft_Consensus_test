@@ -80,21 +80,21 @@ public class Main extends Thread{
         }
     }
 
-
-    static {
-        Runtime.getRuntime().addShutdownHook(new Thread(()->{
-            for (Socket socket :OpenSockets){
-                try{
-                    if(!socket.isClosed()){
-                        socket.close();
-                        System.out.print("closed socket for port :"+socket.getPort());
-                    }
-                } catch (IOException e) {
-                    System.out.print("failed to close the socket during cleaning up");
-                }
-            }
-        }));
-    }
+//
+//    static {
+//        Runtime.getRuntime().addShutdownHook(new Thread(()->{
+//            for (Socket socket :OpenSockets){
+//                try{
+//                    if(!socket.isClosed()){
+//                        socket.close();
+//                        System.out.print("closed socket for port :"+socket.getPort());
+//                    }
+//                } catch (IOException e) {
+//                    System.out.print("failed to close the socket during cleaning up");
+//                }
+//            }
+//        }));
+//    }
 
     private static void Handle_client(Socket clientsock){
         try(
