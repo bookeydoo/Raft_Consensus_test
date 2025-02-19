@@ -1,6 +1,4 @@
 
-package org.example;
-
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -59,7 +57,7 @@ public class Main extends Thread{
                 socket.connect(address,Timeout);
 
                 connected=true;
-                System.out.print("we are connected");
+                System.out.print("we are connected \n");
                 OpenSockets.add(socket);
 
             }   catch(SocketTimeoutException e){
@@ -136,9 +134,16 @@ public class Main extends Thread{
                 System.out.print("default port gonna be used ");
             }
         }
-        new Thread(()->Main.start_server(port)).start();
-        new Thread(()->Main.connectToPeers(65531)).start();
-        new Thread(()->Main.connectToPeers(65532)).start();
 
+        
+        new Thread(()->Main.start_server(port)).start();
+        for( int i=65530 ; i< 65533;i++){
+            if(i==port){
+                continue;
+            }
+            int peerport=i;
+        new Thread(()->Main.connectToPeers(peerport)).start();
+    
+        }
     }
 }
