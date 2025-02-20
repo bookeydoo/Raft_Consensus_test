@@ -4,6 +4,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.lang.Thread;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +21,15 @@ public class Main extends Thread{
 
     public static int port=65530;// default port
 
+
+    public static int LeaderPort=0; //if it equals 0 means unknown port else we will specify the actual value
+
+    private static boolean isLeader=false; 
+
     private static final List<Socket>OpenSockets=new ArrayList<>();
+
+    private static List<String>Log=new ArrayList<>();
+
 
     public static void start_server(int Port) {
 
@@ -44,8 +53,11 @@ public class Main extends Thread{
 
     private static void connectToPeers(int Port){
 
-
+        //normal timeout
         int Timeout=random.nextInt(50,200);
+        //Election timeout (used for electing leader)
+        int LeaderTimeout=random.nextInt(150,300);
+
         boolean connected=false;
         InetSocketAddress address=new InetSocketAddress(Port);
         Socket socket=new Socket();
@@ -59,6 +71,10 @@ public class Main extends Thread{
                 connected=true;
                 System.out.print("we are connected \n");
                 OpenSockets.add(socket);
+                if(LeaderPort == -1){   //our server becomes a candidate
+                    
+
+                }
 
             }   catch(SocketTimeoutException e){
                 System.out.print("Timeout connecting to "+Port+" Retrying...\n");
@@ -119,6 +135,17 @@ public class Main extends Thread{
 
 
     }
+
+
+    private static void LeaderFunc(){
+
+        
+
+
+
+
+    }
+
 
 
     public static void main(String[] args) {
