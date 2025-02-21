@@ -114,9 +114,11 @@ public class Main extends Thread{
     }
 
     private static  void PersistState(int port,String votedfor){
-        try(FileWriter writer =new FileWriter("node"+port+".txt")){
+        String filePath = "C:/Users/waleed/OneDrive/Documents/GitHub/Raft_consensus_test/node" + port + ".txt";
+        try(FileWriter writer =new FileWriter(filePath)){
             writer.write("current CurrentTerm :"+ CurrentTerm +"\n");
             writer.write("Voted for :"+votedfor);
+            System.out.println("persisted file");
         } catch ( IOException e) {
             System.out.print("failed to persist this state");
         }
@@ -133,7 +135,7 @@ public class Main extends Thread{
         boolean connected=false;
         InetSocketAddress address=new InetSocketAddress(Port);
        
-        while (true) {
+        while (!connected) {
             Socket socket=new Socket();
 
             try{
