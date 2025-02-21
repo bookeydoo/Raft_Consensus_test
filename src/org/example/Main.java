@@ -114,7 +114,7 @@ public class Main extends Thread{
     }
 
     private static  void PersistState(int port,String votedfor){
-        String filePath = "C:/Users/waleed/OneDrive/Documents/GitHub/Raft_consensus_test/node" + port + ".txt";
+        String filePath = "C:/temp/node" + port + ".txt";
         try(FileWriter writer =new FileWriter(filePath)){
             writer.write("current CurrentTerm :"+ CurrentTerm +"\n");
             writer.write("Voted for :"+votedfor);
@@ -129,7 +129,7 @@ public class Main extends Thread{
     private static void connectToPeers(int Port){
 
         //normal timeout
-        int Timeout=random.nextInt(50,200);
+        int Timeout=random.nextInt(500,2000);
 
 
         boolean connected=false;
@@ -249,6 +249,8 @@ public class Main extends Thread{
 
             if(VotedFor.isEmpty() || VotedFor.equals(parts[2])){
                 VotedFor=parts[2];
+                int candidatePort=Integer.parseInt(parts[2]);
+                Votes.add(new Candidate(candidatePort,1));
                 out.println("VOTE-GRANTED "+CurrentTerm);
                 PersistState(Serverport,VotedFor);
             }else {
@@ -315,13 +317,7 @@ public class Main extends Thread{
             }
         }
 
-         ElectionTimeoutScheduler=Executors.newScheduledThreadPool(1);
-         ElectionTimeoutScheduler.scheduleAtFixedRate(()->{
-            if(!isLeader && !isCandidate){
-                Start_Election();
-            }
-        },0,150+random.nextInt(150), TimeUnit.MILLISECONDS);
-
+        scheduleElectionTimeout();
 
         new Thread(()->Main.start_server(Serverport)).start();
         for( int i=65530 ; i< 65533;i++){
