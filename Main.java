@@ -1,5 +1,4 @@
 
-
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -33,6 +32,7 @@ public class Main extends Thread{
 
     private static List<String>Log=new ArrayList<>();
 
+    private static String VotedFor="";
 
 
     public static void start_server(int Port) {
@@ -66,7 +66,7 @@ public class Main extends Thread{
     private static String Election_func(Socket listening_sock,Socket sending_sock){
         //Election timeout (used for electing leader)
         int LeaderTimeout=random.nextInt(150,300);
-        String VotedFor="";
+
         if(LeaderPort==0 && isLeader==false){ //wait until timeout to tell if a candidate or not
             try{
                 Thread.sleep(LeaderTimeout);
@@ -137,11 +137,24 @@ public class Main extends Thread{
                 PrintWriter out=new PrintWriter(clientsock.getOutputStream(),true);
 
         ) {
-            out.println("input 2 values\n");
-            int x= Integer.parseInt( in.readLine());
-            int y= Integer.parseInt( in.readLine());
-            int result=x+y;
-            System.out.print(result+"\n");
+            String Msg;
+            while ((Msg=in.readLine()) != null){
+                if(Msg.startsWith("REQUEST_VOTE")){
+                    if(!isCandidate){
+                    handleVoteRequest(Msg,out);
+                    }
+                }else if(Msg.startsWith("APPEND-ENTRIES")){
+                    //reset Election (this means the leader is live)
+                    LeaderPort= clientsock.getPort();
+                    String [] parts =Msg.split("APPEND-ENTRIES",2);
+                    if(parts.length>1){
+                        String result=parts[1];
+                        Log.add(result);
+                    }
+
+
+                }
+            }
 
         } catch (IOException e) {
             System.out.print("sth wrong happened while trying to read from the client\n");
@@ -156,6 +169,22 @@ public class Main extends Thread{
 
 
     }
+
+    private static void handleVoteRequest(String msg,PrintWriter out){
+
+        String [] parts=msg.split(" ");
+        int term=Integer.parseInt(parts[1]);
+        if(term>CurrentTerm){
+            CurrentTerm=term;
+            VotedFor=null;
+        }
+        if(isCandidate){
+            VotedFor="Me";
+        }
+        //write voting stuff
+
+        out.write(VotedFor);
+     }
 
 
     private static void LeaderFunc(String log){
