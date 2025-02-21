@@ -1,4 +1,4 @@
-package org.example;
+
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -7,10 +7,9 @@ import java.lang.Thread;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.net.SocketTimeoutException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 import java.util.Random;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 
 //basic server that  does summation to 2 values and return it
@@ -28,9 +27,9 @@ public class Main extends Thread{
     private static boolean isLeader=false;
     private static boolean isCandidate =false;
 
-    private static int term=0;  //stands for election term it is incremented when an election starts
+    private static int CurrentTerm =0;  //stands for election CurrentTerm it is incremented when an election starts
 
-    private static final List<Socket>OpenSockets=new ArrayList<>();
+    private static final List<Socket>Peers=new CopyOnWriteArrayList<>();
 
     private static List<String>Log=new ArrayList<>();
 
@@ -72,7 +71,8 @@ public class Main extends Thread{
             try{
                 Thread.sleep(LeaderTimeout);
                 System.out.print("candidate ");
-                VotedFor="vote for me";
+                isCandidate=true;
+                VotedFor="me";
 
             } catch (InterruptedException e) { //Received a vote for me rpc meaning u arent gonna be candidate
                 System.out.print("this node isn't a candidate");
@@ -83,7 +83,7 @@ public class Main extends Thread{
 
     private static  void PersistState(int port,String votedfor){
         try(FileWriter writer =new FileWriter("node"+port+".txt")){
-            writer.write("current term :"+term+"\n");
+            writer.write("current CurrentTerm :"+ CurrentTerm +"\n");
             writer.write("Voted for :"+votedfor);
         } catch ( IOException e) {
             System.out.print("failed to persist this state");
@@ -110,7 +110,7 @@ public class Main extends Thread{
 
                 connected=true;
                 System.out.print("we are connected \n");
-                OpenSockets.add(socket);
+                Peers.add(socket);
 
             }   catch(SocketTimeoutException e){
                 System.out.print("Timeout connecting to "+Port+" Retrying...\n");
@@ -125,30 +125,13 @@ public class Main extends Thread{
             }catch(IOException IE){
                 System.out.print("failed to connect to node "+Port+IE.getMessage()+"\n");
                 break;
-            } catch (InterruptedException e) {
-                System.out.print("interrupted timeout of server");
             }
 
         }
     }
 
-//
-//    static {
-//        Runtime.getRuntime().addShutdownHook(new Thread(()->{
-//            for (Socket socket :OpenSockets){
-//                try{
-//                    if(!socket.isClosed()){
-//                        socket.close();
-//                        System.out.print("closed socket for port :"+socket.getPort());
-//                    }
-//                } catch (IOException e) {
-//                    System.out.print("failed to close the socket during cleaning up");
-//                }
-//            }
-//        }));
-//    }
 
-    private static void Handle_client(Socket clientsock){
+    private static void Handle_client(Socket clientsock){ //TODO change this to listen for the votes
         try(
                 BufferedReader in=new BufferedReader(new InputStreamReader(clientsock.getInputStream()));
                 PrintWriter out=new PrintWriter(clientsock.getOutputStream(),true);
@@ -175,13 +158,24 @@ public class Main extends Thread{
     }
 
 
-    private static void LeaderFunc(){
+    private static void LeaderFunc(String log){
 
-
-
-
-
-
+    while (isLeader){
+        for(Socket Peer:Peers){
+            try {
+                PrintWriter out=new PrintWriter(Peer.getOutputStream(),true);
+                out.println(String.format("APPEND_ENTRIES %d %s",CurrentTerm,log));
+            } catch (IOException e) {
+                System.out.print("Heartbeat failed to node :"+Peer);
+            }
+            try {
+                int x=random.nextInt(150,200);
+                Thread.sleep(x);
+            } catch (InterruptedException e) {
+                System.out.print("oh no bro");
+                }
+            }
+        }
     }
 
 
