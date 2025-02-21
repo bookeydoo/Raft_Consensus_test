@@ -5,4 +5,4 @@ This project is made to learn about RAFT and try learning about distrubiuted sys
 
 **Using build tools like gradle and maven is easier and will build automatically if u put them in same package**
 
-**if using bash use javac -d bin src/org/example/*.java**
+**if using bash use javac -d bin src/org/example/*.java then compile with java -cp bin org.example.Main**

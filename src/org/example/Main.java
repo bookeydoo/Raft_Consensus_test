@@ -92,6 +92,8 @@ public class Main extends Thread{
         new Thread(()->{
             while (true){
                 synchronized (Main.class){
+
+
                     if(!isCandidate) break;
                     for(Candidate c:Votes){
                         if(c.getCandidatePort()==Serverport){
@@ -100,6 +102,9 @@ public class Main extends Thread{
                                 isLeader=true;
                                 isCandidate=false;
                                 break;
+                            }
+                            if (Votes.stream().filter(C -> C.getCandidatePort() == Serverport).count() > Peers.size() / 2.0) {
+                                isLeader = true;
                             }
                         }
                     }
