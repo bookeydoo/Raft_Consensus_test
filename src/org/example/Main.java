@@ -9,9 +9,7 @@ import java.util.ArrayList;
 import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.*;
 
 
 public class Main extends Thread{
@@ -21,7 +19,8 @@ public class Main extends Thread{
 
     public static int Serverport =65530;// default Serverport
 
-    private ScheduledExecutorService ElectionTimeoutScheduler= Executors.newScheduledThreadPool(1);
+    public static ScheduledExecutorService ElectionTimeoutScheduler= Executors.newScheduledThreadPool(1);
+    private static ScheduledFuture<?>electionTimeoutFuture;
     public static int LeaderPort=0; //if it equals 0 means unknown Serverport else we will specify the actual value
 
     private static boolean isLeader=false;
@@ -35,7 +34,7 @@ public class Main extends Thread{
 
     private static String VotedFor="";
 
-    private static List<Vote> Votes=new CopyOnWriteArrayList<>();
+    private static List<Candidate> Votes=new CopyOnWriteArrayList<>();
 
 
     public static void start_server(int Port) {
@@ -73,11 +72,45 @@ public class Main extends Thread{
     private static void Start_Election(){
         //Election timeout (used for electing leader)
 
-        if(isCandidate){
-            for(Socket Peer:Peers){
-                RequestVote(Peer);
+        synchronized (Main.class){
+            if(isCandidate || isLeader){
+                return;
             }
+
+
+            CurrentTerm++;
+            isCandidate=true;
+            VotedFor="self";
+            Votes.clear();
+            Votes.add(new Candidate(Serverport,1));
         }
+
+        for(Socket Peer:Peers){
+            RequestVote(Peer);
+        }
+
+        new Thread(()->{
+            while (true){
+                synchronized (Main.class){
+                    if(!isCandidate) break;
+                    for(Candidate c:Votes){
+                        if(c.getCandidatePort()==Serverport){
+
+                            if( c.NoOfVotes  > Peers.size()/2){
+                                isLeader=true;
+                                isCandidate=false;
+                                break;
+                            }
+                        }
+                    }
+                }try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }).start();
+
     }
 
     private static  void PersistState(int port,String votedfor){
@@ -99,9 +132,9 @@ public class Main extends Thread{
 
         boolean connected=false;
         InetSocketAddress address=new InetSocketAddress(Port);
-        Socket socket=new Socket();
-        while (!connected) {
-
+       
+        while (true) {
+            Socket socket=new Socket();
 
             try{
                 System.out.print("attempting to connect  to node :"+Port+"timeout:"+Timeout+"ms \n");
@@ -151,67 +184,90 @@ public class Main extends Thread{
             }
 
             while ((Msg=in.readLine()) != null){
-                if(Msg.startsWith("REQUEST_VOTE")){
-                    if(!isCandidate){
-                    handleVoteRequest(Msg,out);
-                    }
+                if(Msg.startsWith("REQUEST-VOTE")){
+
+                    handleVoteRequest(Msg,out,clientsock);
+
                 }else if(Msg.startsWith("APPEND-ENTRIES")){
                     //reset Election (this means the leader is live)
+                    scheduleElectionTimeout();
                     LeaderPort= clientsock.getPort();
+                    isCandidate=false;
                     String [] parts =Msg.split("APPEND-ENTRIES",2);
+                    int leaderTerm=Integer.parseInt(parts[1]);
+                    if(leaderTerm<CurrentTerm){
+                        out.println("APPEND-REJECTED"+CurrentTerm);
+                    }
                     if(parts.length>1){
                         String result=parts[1];
                         Log.add(result);
                     }
 
 
+
+                } else if(Msg.startsWith("VOTE-GRANTED")){
+                    synchronized (Main.class){
+                        Votes.add(new Candidate(clientsock.getPort(),1));
+                    }
                 }
             }
 
         } catch (IOException e) {
             System.out.print("sth wrong happened while trying to read from the client\n");
-        }finally {
-            try {
-                clientsock.close();
-                System.out.print("memory freed\n");
-            } catch (IOException e) {
-                System.out.print("error closing client sock");
+        }
+    }
+
+
+
+
+
+
+    private static void handleVoteRequest(String msg,PrintWriter out,Socket sock) {
+
+        String[] parts = msg.split(" ");
+        int term = Integer.parseInt(parts[1]);
+
+        synchronized (Main.class) {
+            if (term > CurrentTerm) {
+                isCandidate=false;
+                isLeader=false;
+                CurrentTerm = term;
+                VotedFor = "" ;
+            }
+            int candidateLastLogindex=Integer.parseInt(parts[3]);
+            if(Log.size()>candidateLastLogindex){
+                out.println("VOTE-DENIED"+CurrentTerm);
+                return;
+            }
+
+            if(VotedFor.equals(parts[2])){
+                int candidatePort=Integer.parseInt(parts[2]);
+                Votes.add(new Candidate(candidatePort,1));
+            }
+
+            if(VotedFor.isEmpty() || VotedFor.equals(parts[2])){
+                VotedFor=parts[2];
+                out.println("VOTE-GRANTED "+CurrentTerm);
+                PersistState(Serverport,VotedFor);
+            }else {
+                out.println("VOTE-DENIED "+CurrentTerm);
             }
         }
 
-
     }
-
-    private static void handleVoteRequest(String msg,PrintWriter out){
-
-        String [] parts=msg.split(" ");
-        int term=Integer.parseInt(parts[1]);
-        if(term>CurrentTerm){
-            CurrentTerm=term;
-            VotedFor=null;
-        }
-        if(isCandidate){
-            VotedFor="Me";
-        }
-        //write voting stuff
-
-        out.write(VotedFor);
-     }
-
-
     private static void LeaderFunc(String lastLogEntry){
 
     while (isLeader){
+        System.out.print("I am the leader");
         for(Socket Peer:Peers){
             try {
                 PrintWriter out=new PrintWriter(Peer.getOutputStream(),true);
-                out.println(String.format("APPEND_ENTRIES %d %s",CurrentTerm,lastLogEntry));
+                out.println(String.format("APPEND-ENTRIES %d %s %d",CurrentTerm,lastLogEntry,Log.size()));
             } catch (IOException e) {
                 System.out.print("Heartbeat failed to node :"+Peer);
             }
             try {
-                int x=random.nextInt(150,200);
-                Thread.sleep(x);
+                Thread.sleep(50);
             } catch (InterruptedException e) {
                 System.out.print("oh no bro");
                 }
@@ -219,13 +275,35 @@ public class Main extends Thread{
         }
     }
 
+    //no idea what this does copy and pasted tbh
+    private static void scheduleElectionTimeout() {
+        // Cancel existing timeout (if any)
+        if (electionTimeoutFuture != null && !electionTimeoutFuture.isDone()) {
+            electionTimeoutFuture.cancel(false);
+        }
+
+        // Randomize timeout (150-300ms)
+        int timeout = random.nextInt(150, 300);
+        electionTimeoutFuture = ElectionTimeoutScheduler.schedule(
+                () -> {
+                    synchronized (Main.class) {
+                        if (!isLeader && !isCandidate) {
+                            Start_Election();
+                        }
+                    }
+                    scheduleElectionTimeout(); // Reschedule after execution
+                },
+                timeout,
+                TimeUnit.MILLISECONDS
+        );
+    }
 
 
     public static void main(String[] args) {
 
 
 
-        if ( args.length >= 2 && args[0].equals("--Serverport")) {
+        if ( args.length >= 2 && args[0].equals("--port")) {
             try {
                 Serverport = Integer.parseInt(args[1]);
 
@@ -234,6 +312,13 @@ public class Main extends Thread{
                 System.out.print("default Serverport gonna be used ");
             }
         }
+
+         ElectionTimeoutScheduler=Executors.newScheduledThreadPool(1);
+         ElectionTimeoutScheduler.scheduleAtFixedRate(()->{
+            if(!isLeader && !isCandidate){
+                Start_Election();
+            }
+        },0,150+random.nextInt(150), TimeUnit.MILLISECONDS);
 
 
         new Thread(()->Main.start_server(Serverport)).start();
