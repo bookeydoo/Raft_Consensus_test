@@ -1,3 +1,4 @@
+package org.example;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -24,11 +25,15 @@ public class Main extends Thread{
 
     public static int LeaderPort=0; //if it equals 0 means unknown port else we will specify the actual value
 
-    private static boolean isLeader=false; 
+    private static boolean isLeader=false;
+    private static boolean isCandidate =false;
+
+    private static int term=0;  //stands for election term it is incremented when an election starts
 
     private static final List<Socket>OpenSockets=new ArrayList<>();
 
     private static List<String>Log=new ArrayList<>();
+
 
 
     public static void start_server(int Port) {
@@ -51,12 +56,47 @@ public class Main extends Thread{
 
     }
 
+    private static void RequestVote(Socket node){
+        try {
+            PrintWriter out = new PrintWriter(node.getOutputStream(), true);
+        } catch (IOException e) {
+            System.out.print("sth");
+        }
+    }
+
+    private static String Election_func(Socket listening_sock,Socket sending_sock){
+        //Election timeout (used for electing leader)
+        int LeaderTimeout=random.nextInt(150,300);
+        String VotedFor="";
+        if(LeaderPort==0 && isLeader==false){ //wait until timeout to tell if a candidate or not
+            try{
+                Thread.sleep(LeaderTimeout);
+                System.out.print("candidate ");
+                VotedFor="vote for me";
+
+            } catch (InterruptedException e) { //Received a vote for me rpc meaning u arent gonna be candidate
+                System.out.print("this node isn't a candidate");
+
+            }
+        } return VotedFor;
+    }
+
+    private static  void PersistState(int port,String votedfor){
+        try(FileWriter writer =new FileWriter("node"+port+".txt")){
+            writer.write("current term :"+term+"\n");
+            writer.write("Voted for :"+votedfor);
+        } catch ( IOException e) {
+            System.out.print("failed to persist this state");
+        }
+
+    }
+
+
     private static void connectToPeers(int Port){
 
         //normal timeout
         int Timeout=random.nextInt(50,200);
-        //Election timeout (used for electing leader)
-        int LeaderTimeout=random.nextInt(150,300);
+
 
         boolean connected=false;
         InetSocketAddress address=new InetSocketAddress(Port);
@@ -71,10 +111,6 @@ public class Main extends Thread{
                 connected=true;
                 System.out.print("we are connected \n");
                 OpenSockets.add(socket);
-                if(LeaderPort == -1){   //our server becomes a candidate
-                    
-
-                }
 
             }   catch(SocketTimeoutException e){
                 System.out.print("Timeout connecting to "+Port+" Retrying...\n");
@@ -89,6 +125,8 @@ public class Main extends Thread{
             }catch(IOException IE){
                 System.out.print("failed to connect to node "+Port+IE.getMessage()+"\n");
                 break;
+            } catch (InterruptedException e) {
+                System.out.print("interrupted timeout of server");
             }
 
         }
@@ -139,7 +177,7 @@ public class Main extends Thread{
 
     private static void LeaderFunc(){
 
-        
+
 
 
 
@@ -162,15 +200,15 @@ public class Main extends Thread{
             }
         }
 
-        
+
         new Thread(()->Main.start_server(port)).start();
         for( int i=65530 ; i< 65533;i++){
             if(i==port){
                 continue;
             }
             int peerport=i;
-        new Thread(()->Main.connectToPeers(peerport)).start();
-    
+            new Thread(()->Main.connectToPeers(peerport)).start();
+
         }
     }
 }
