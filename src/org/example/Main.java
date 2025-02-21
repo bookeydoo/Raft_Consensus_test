@@ -74,6 +74,7 @@ public class Main extends Thread{
 
         synchronized (Main.class){
             if(isCandidate || isLeader){
+                System.out.println("Already a candidate/leader. Skipping election.");
                 return;
             }
 
